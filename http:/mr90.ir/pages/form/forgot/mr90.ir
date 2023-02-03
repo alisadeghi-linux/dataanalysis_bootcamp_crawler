@@ -1,1 +1,70 @@
+# Scraping the links of the results from http://mr90.ir/lists/league
+__author__ = "Ali Sadeghi"
+__email__ = "sadeghi.ali31@yahoo.com"
+__organization__ = "Quera"
+__website__ = "https://quera.org"
+__version__ = "1.0.0"
+__date__ = "2023-01-25"
+import pandas as pd
+import time
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+import pandas as pd
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
+options = Options()
+options.headless = True
+driver = webdriver.Chrome(options=options)
+df = pd.DataFrame(columns=['profile_name', 'profile_url', 'sign_date', 'province', 'arrangement','last_seen'])
+def sign(href):
+    try:
+      driver.get(href)
+      wait = WebDriverWait(driver, 1)
+      wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '#inf3 div[r="l"] .inf')))
+      Member = driver.find_elements(By.CSS_SELECTOR, '#inf3 div[r="l"] .inf')[0]
+      MemberDate = Member.text.split('\n')[0].split(': ')[1].split(' ')[2]
+      province = Member.text.split('\n')[1].split(': ')[1]
+      arrangement = driver.find_elements(By.CSS_SELECTOR, '#inf3 div[r="l"] .dta')[0].text.split('\n')[1]
+      last = driver.find_elements(By.CSS_SELECTOR, '#prf_inf_tools span')[0].get_attribute('oldtitle').split('</BR>')[1]
+      last_seen = last.split(': ')[1] if len(last)>0 else 'online'
+    except: 
+        MemberDate = None
+        province = None
+        arrangement = None
+        last_seen = None
+    return (MemberDate,province,arrangement,last_seen)
+for page in range(1,5):
+    page_num = '/' + str(page)
+    url = 'http://mr90.ir/lists/league' + page_num
+    driver.get(url)
+    players = driver.find_elements(By.CSS_SELECTOR, 'tbody tr td[r="3"] a')
+    players_list = []
+    url_list = []
+    signin = []
+    province = [] 
+    arrangement = []
+    last_seen = []
+    for p in range(len(players)):
+        players_list.append(players[p].text)
+        url_list.append(players[p].get_attribute('href'))
+        d1,d2,d3,d4 = sign(url_list[p])
+        signin.append(d1)
+        province.append(d2)
+        arrangement.append(d3)
+        last_seen.append(d4)
+        driver.get(url)
+        players = driver.find_elements(By.CSS_SELECTOR, 'tbody tr td[r="3"] a')
+    data_tuples = list(zip(players_list,url_list,signin,province,arrangement,last_seen))
+    tempdf = pd.DataFrame(data_tuples,columns=['profile_name', 'profile_url', 'sign_date', 'province', 'arrangement', 'last_seen'])
+    df = df.append(tempdf)
+print(df)
+df.to_csv('mr90.csv', index=False, header=True)
+data = pd.read_csv('mr90.csv')
+print(data.head())
+print(data['province'].value_counts())
+print(data['last_seen'].value_counts())
+print(data['sign_date'].value_counts())
+driver.quit()
